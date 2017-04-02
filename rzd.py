@@ -1,10 +1,13 @@
+# coding=utf-8
 import datetime
 import sys
 
 import requests
 import telegram
 
-bot = telegram.Bot(token='')
+from settings import BOT_TOKEN, MY_TELEGRAM_ID
+
+bot = telegram.Bot(token=BOT_TOKEN)
 COOKIE = 'JSESSIONID=0000Rzt5E96njjvSmVkq4kNft-Y:17obq8rib'
 
 
@@ -103,7 +106,9 @@ def check_car_and_seat(code_from, code_to, date, train_number,
                 for s2 in s1['places'].split(',')])
             if needed_seat in available_seats:
                 print('Запрошенное место {} найдено!'.format(needed_seat))
-                bot.sendMessage(chat_id='', text='Запрошенное место {} найдено!'.format(needed_seat))
+                bot.sendMessage(
+                    chat_id=MY_TELEGRAM_ID,
+                    text='Запрошенное место {} найдено!'.format(needed_seat))
             else:
                 print(
                     'Запрошенное место {} не найдено. Доступны места: {}'
@@ -147,11 +152,13 @@ def main():
 
     print('Места нужного типа {} в запрошенном поезде найдены. '
           'Проверяем вагон и место'.format(needed_type))
-    bot.sendMessage(chat_id='', text='Места нужного типа {} в запрошенном поезде найдены.'.format(needed_type))
+    bot.sendMessage(
+        chat_id=MY_TELEGRAM_ID,
+        text='Места нужного типа {} в запрошенном поезде '
+             'найдены.'.format(needed_type))
     for train in trains:
         assert train['number'] == train['number2']
         check_car_and_seat(code_from, code_to, date, train['number'],
                            needed_car, needed_seat)
 
 main()
-
