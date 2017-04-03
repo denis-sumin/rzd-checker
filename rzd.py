@@ -1,5 +1,4 @@
 # coding=utf-8
-import datetime
 import logging
 import sys
 import time
@@ -153,9 +152,6 @@ def check_car_and_seat(code_from, code_to, date, train_number,
 
 def perform_check(code_from, code_to, date, train_number,
                   car_type, car_number, seat_number):
-    r = requests.get('https://pass.rzd.ru', timeout=REQUEST_TIMEOUT)
-    request_data['cookies'] = r.cookies
-
     result = CheckResult()
 
     train_found, trains_with_requested_car_type, train_info = check_trains(
@@ -315,9 +311,12 @@ def run_checker(code_from, code_to, date, train_number,
     last_result_timestamp = 0
     last_tb = None
     while True:
+        r = requests.get('https://pass.rzd.ru', timeout=REQUEST_TIMEOUT)
+        request_data['cookies'] = r.cookies
         try:
             check_result, train_info = perform_check(
-                code_from, code_to, date, train_number, car_type, car_number, seat)
+                code_from, code_to, date, train_number, car_type,
+                car_number, seat)
         except (requests.exceptions.Timeout,
                 requests.exceptions.ConnectionError):
             if time.time() - last_result_timestamp > 60:
