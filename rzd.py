@@ -134,7 +134,7 @@ def check_car_and_seat(code_from, code_to, date, train_number,
             logger.info('Найден нужный вагон: {}'.format(car_number))
             if not seat_number:
                 break
-            available_seats = sorted([
+            available_seats = set([
                 int(s2) for s1 in car['seats']
                 for s2 in s1['places'].split(',')])
             if seat_number in available_seats:
@@ -191,7 +191,7 @@ def perform_check(code_from, code_to, date, train_number,
                 car_number, seat_number)
             result.car_number_found = found_car
             result.seat_number_found = found_seat
-            result.available_seats = set(available_seats)
+            result.available_seats = available_seats
 
     return result, train_info
 
