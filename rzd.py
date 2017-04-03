@@ -44,17 +44,13 @@ def join_seat_numbers(seat_numbers):
         return 'нет'
 
 
+def filter_numeric_chars(s):
+    return ''.join(c for c in s if c.isdigit())
+
+
 def get_data(url, data, cookies):
     r_rid = requests.post(url, data=data, cookies=cookies,
                           timeout=REQUEST_TIMEOUT)
-    try:
-        if r_rid.json()['result'] == 'RID':
-            data['rid'] = r_rid.json()['RID']
-        else:
-            raise RuntimeError('No RID')
-    except Exception as e:
-        print(e)
-        raise
 
     while True:
         r_data = requests.post(url, data=data, cookies=cookies,
@@ -101,8 +97,8 @@ def check_trains(code_from, code_to, date, train_number, car_type):
 
     for train in trains:
         if (
-                str(train_number) in train['number'] or
-                str(train_number) in train['number2']
+                train_number == int(filter_numeric_chars(train['number'])) or
+                train_number == int(filter_numeric_chars(train['number2']))
         ):
             train_found = True
             logging.info('Запрошенный поезд {} найден'.format(train_number))
@@ -322,7 +318,8 @@ def run_checker(code_from, code_to, date, train_number,
         try:
             check_result, train_info = perform_check(
                 code_from, code_to, date, train_number, car_type, car_number, seat)
-        except requests.exceptions.Timeout:
+        except (requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError):
             if time.time() - last_result_timestamp > 60:
                 last_result_timestamp = time.time()
                 bot.sendMessage(
