@@ -7,7 +7,8 @@ import traceback
 import requests
 import telegram
 
-from settings import BOT_TOKEN, CHECK_EVERY, MY_TELEGRAM_ID
+from call import dial_numbers
+from settings import BOT_TOKEN, CHECK_EVERY, DIAL_NUMBERS, MY_TELEGRAM_ID
 
 REQUEST_TIMEOUT = 10.
 
@@ -108,7 +109,7 @@ def check_trains(code_from, code_to, date, train_number, car_type):
 
 
 def check_car_and_seat(code_from, code_to, date, train_number,
-                       car_number, seat_number=None):
+                       car_number, car_type, seat_number=None):
     data = {
         'dir': 0,
         'seatDetails': 1,
@@ -129,13 +130,21 @@ def check_car_and_seat(code_from, code_to, date, train_number,
 
     for car in cars:
         if int(car['cnumber']) == car_number:
-            found_car = True
-            logger.info('Найден нужный вагон: {}'.format(car_number))
-            if not seat_number:
-                break
+            if car['type'] != car_type:
+                logger.info('Запрошенный вагон найден, однако тип '
+                            'не соответствует запрошенному')
+                continue
+
             available_seats = set([
                 int(s2) for s1 in car['seats']
                 for s2 in s1['places'].split(',')])
+
+            if available_seats:
+                logger.info('Найден нужный вагон: {}'.format(car_number))
+                found_car = True
+
+            if not seat_number:
+                break
             if seat_number in available_seats:
                 found_seat = True
                 logger.info('Запрошенное место {} найдено!'
@@ -184,7 +193,7 @@ def perform_check(code_from, code_to, date, train_number,
         if car_number:
             found_car, found_seat, available_seats = check_car_and_seat(
                 code_from, code_to, date, train['number'],
-                car_number, seat_number)
+                car_number, car_type, seat_number)
             result.car_number_found = found_car
             result.seat_number_found = found_seat
             result.available_seats = available_seats
@@ -198,44 +207,52 @@ def bool_to_russian(v):
 
 def process_check_result(check_result, last_check_result, train_info):
     call_needed = False
-    message = None
+
+    update_message = (
+        'Новая информация по запросу: поезд {train_number}, '
+        '{from_} → {to}, {date}.\n'
+        'Поезд найден: {train_found}.\n'
+        'Места типа {car_type}: {car_type_found}.\n'
+        'Вагон {car_number}: {car_number_found}.\n'
+        'Место {seat_number}: {seat_number_found}.\n'
+        'Доступные места: {available_seats}.'.format(
+            train_number=train_info.train_number,
+            from_=train_info.from_,
+            to=train_info.to,
+            date=train_info.date,
+            train_found=bool_to_russian(check_result.train_found),
+            car_type=train_info.requested_car_type,
+            car_type_found=bool_to_russian(check_result.car_type_found),
+            car_number=train_info.requested_car_number,
+            car_number_found=bool_to_russian(check_result.car_number_found),
+            seat_number=train_info.requested_seat_number,
+            seat_number_found=bool_to_russian(check_result.seat_number_found),
+            available_seats=join_seat_numbers(check_result.available_seats),
+        )
+    )
 
     order = (
-        'train_found',
-        'car_type_found',
-        'car_number_found',
         'seat_number_found',
         'available_seats',
+        'car_number_found',
+        'car_type_found',
+        'train_found',
     )
 
     for attr in order:
         if getattr(last_check_result, attr) != getattr(check_result, attr):
-            message = (
-                'Новая информация по запросу: поезд {train_number}, '
-                '{from_} → {to}, {date}.\n'
-                'Поезд найден: {train_found}.\n'
-                'Места типа {car_type}: {car_type_found}.\n'
-                'Вагон {car_number}: {car_number_found}.\n'
-                'Место {seat_number}: {seat_number_found}.\n'
-                'Доступные места: {available_seats}.'.format(
-                    train_number=train_info.train_number,
-                    from_=train_info.from_,
-                    to=train_info.to,
-                    date=train_info.date,
-                    train_found=bool_to_russian(check_result.train_found),
-                    car_type=train_info.requested_car_type,
-                    car_type_found=bool_to_russian(check_result.car_type_found),
-                    car_number=train_info.requested_car_number,
-                    car_number_found=bool_to_russian(check_result.car_number_found),
-                    seat_number=train_info.requested_seat_number,
-                    seat_number_found=bool_to_russian(check_result.seat_number_found),
-                    available_seats=join_seat_numbers(check_result.available_seats),
-                )
-            )
-            if attr == 'seat_number_found' and check_result.seat_number_found:
+            if (
+                (attr == 'seat_number_found' and
+                    last_check_result.seat_number_found is False and
+                    check_result.seat_number_found) or
+                (attr == 'car_number_found' and
+                    last_check_result.car_number_found is False and
+                    check_result.seat_number_found)
+            ):
                 call_needed = True
+            return update_message, call_needed
 
-    return message, call_needed
+    return None, False
 
 
 def run_checker(code_from, code_to, date, train_number,
@@ -261,6 +278,7 @@ def run_checker(code_from, code_to, date, train_number,
                 continue
         except Exception:
             tb = traceback.format_exc()
+            print(tb)
             if tb != last_tb:
                 bot.sendMessage(
                     chat_id=MY_TELEGRAM_ID,
@@ -275,6 +293,8 @@ def run_checker(code_from, code_to, date, train_number,
                     chat_id=MY_TELEGRAM_ID,
                     text='{}\nЗвоним: {}'.format(
                         message, bool_to_russian(call_needed)))
+            if call_needed:
+                dial_numbers(DIAL_NUMBERS)
 
             last_check_result = check_result
             last_result_timestamp = time.time()
