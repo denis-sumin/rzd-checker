@@ -55,17 +55,13 @@ def get_data(url, data, cookies):
     while True:
         r_data = requests.post(url, data=data, cookies=cookies,
                                timeout=REQUEST_TIMEOUT)
-        try:
-            if r_data.json()['result'] == 'OK':
-                break
-            elif r_data.json()['result'] == 'RID':
-                data['rid'] = r_rid.json()['RID']
-                continue
-            else:
-                raise RuntimeError('Unexpecred result', r_data.json())
-        except Exception as e:
-            print(e)
+        if r_data.json()['result'] == 'OK':
+            break
+        elif r_data.json()['result'] == 'RID':
+            data['rid'] = r_rid.json()['RID']
             continue
+        else:
+            raise RuntimeError('Unexpecred result', r_data.json())
 
     return r_data.json()
 
