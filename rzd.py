@@ -36,6 +36,20 @@ class CheckResult:
     seat_number_found = None
     available_seats = None
 
+    def __str__(self):
+        return \
+            'train_found: {train_found}\n' \
+            'car_type_found: {car_type_found}\n' \
+            'car_number_found: {car_number_found}\n' \
+            'seat_number_found: {seat_number_found}\n' \
+            'available_seats: {available_seats}'.format(
+                train_found=self.train_found,
+                car_type_found=self.car_type_found,
+                car_number_found=self.car_number_found,
+                seat_number_found=self.seat_number_found,
+                available_seats=self.available_seats,
+            )
+
 
 def join_seat_numbers(seat_numbers):
     if seat_numbers:
@@ -48,17 +62,25 @@ def filter_numeric_chars(s):
     return ''.join(c for c in s if c.isdigit())
 
 
-def get_data(url, data, cookies):
-    r_rid = requests.post(url, data=data, cookies=cookies,
-                          timeout=REQUEST_TIMEOUT)
+def update_session_variables():
+    r = requests.get('https://pass.rzd.ru', timeout=REQUEST_TIMEOUT)
+    request_data['cookies'] = r.cookies
 
+
+def get_data(url, data, cookies):
     while True:
         r_data = requests.post(url, data=data, cookies=cookies,
                                timeout=REQUEST_TIMEOUT)
         if r_data.json()['result'] == 'OK':
             break
         elif r_data.json()['result'] == 'RID':
-            data['rid'] = r_rid.json()['RID']
+            data['rid'] = r_data.json()['RID']
+            continue
+        elif (
+                r_data.json()['result'] == 'RID' and
+                r_data.json()['type'] == 'SESSION_EXPIRED'
+        ):
+            update_session_variables()
             continue
         else:
             raise RuntimeError('Unexpecred result', r_data.json())
@@ -193,6 +215,12 @@ def perform_check(code_from, code_to, date, train_number,
             result.car_number_found = found_car
             result.seat_number_found = found_seat
             result.available_seats = available_seats
+    else:
+        if car_number:
+            result.car_number_found = False
+            result.available_seats = set()
+        if seat_number:
+            result.seat_number_found = False
 
     return result, train_info
 
@@ -257,8 +285,7 @@ def run_checker(code_from, code_to, date, train_number,
     last_result_timestamp = 0
     last_tb = None
     while True:
-        r = requests.get('https://pass.rzd.ru', timeout=REQUEST_TIMEOUT)
-        request_data['cookies'] = r.cookies
+        update_session_variables()
         try:
             check_result, train_info = perform_check(
                 code_from, code_to, date, train_number, car_type,
@@ -322,4 +349,5 @@ def main():
                 car_number, seat_number)
 
 
-main()
+if __name__ == '__main__':
+    main()
