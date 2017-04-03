@@ -233,8 +233,8 @@ def process_check_result(check_result, last_check_result, train_info):
 
     order = (
         'seat_number_found',
-        'available_seats',
         'car_number_found',
+        'available_seats',
         'car_type_found',
         'train_found',
     )
@@ -247,7 +247,7 @@ def process_check_result(check_result, last_check_result, train_info):
                     check_result.seat_number_found) or
                 (attr == 'car_number_found' and
                     last_check_result.car_number_found is False and
-                    check_result.seat_number_found)
+                    check_result.car_number_found)
             ):
                 call_needed = True
             return update_message, call_needed
